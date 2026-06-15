@@ -1,0 +1,9 @@
+suite rules/promo.cases.yaml — rule rules/promo.yaml (promo-hard, 100 cases)
+  ok   - flags missing disclaimer en
+  ok   - flags missing disclaimer es
+  ok   - passes compliant ad eu
+suite rules/finance.cases.yaml — rule rules/finance.yaml (finance-promo-hard, 8 cases)
+  ok   - apr-required-when-rate-shown
+  ok   - no-false-guarantee
+
+108 passed, 0 failed across 2 suites

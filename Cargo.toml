@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["crates/zaindari-core", "crates/zaindari-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+repository = "https://github.com/enekos/zaindari"
+description = "One CLI over three LLM-trust engines: Gate (evals), Guard (rules), Watch (drift)."
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[workspace.lints.clippy]
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

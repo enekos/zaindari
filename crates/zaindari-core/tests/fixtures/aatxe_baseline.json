@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-06-03T14:26:16Z",
+  "aatxeVersion": "0.1.0",
+  "council": {
+    "casesTotal": 24,
+    "casesFullyRecalled": 12,
+    "casesOverCap": 3,
+    "casesWithJudgeError": 0,
+    "recall": {
+      "criticalCaught": 12,
+      "criticalTotal": 16,
+      "majorCaught": 10,
+      "majorTotal": 21,
+      "minorCaught": 1,
+      "minorTotal": 2,
+      "nitCaught": 0,
+      "nitTotal": 0
+    },
+    "criticalPrecision": 1.0,
+    "criticalRecall": 0.75,
+    "criticalF1": 0.857,
+    "severityCalibrationMae": 0.30,
+    "judgeBrierScore": 0.35,
+    "avgFalsePositivesPerCase": 2.375,
+    "forbiddenPathFindings": 0,
+    "avgLatencyMs": 26000,
+    "totalPromptTokens": 552,
+    "totalCompletionTokens": 52936,
+    "perCase": []
+  },
+  "stats": {
+    "scenariosTotal": 6,
+    "scenariosPassed": 6,
+    "passRate": 1.0,
+    "observedNullFpr": 0.03,
+    "observedBorderlineTpr": 0.85,
+    "perScenario": []
+  },
+  "councilUsedRealLlm": true
+}

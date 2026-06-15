@@ -1,0 +1,39 @@
+[
+  {
+    "name": "Python",
+    "entityType": "skill",
+    "cardinality": 0.12,
+    "zscore": 0.10,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": false,
+    "dimensions": [
+      { "name": "frequency", "kind": "numeric", "score": 0.10, "reason": "common skill", "value": 4210 }
+    ]
+  },
+  {
+    "name": "Klingon programming",
+    "entityType": "skill",
+    "cardinality": 0.94,
+    "zscore": 0.91,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": true,
+    "dimensions": [
+      { "name": "frequency", "kind": "numeric", "score": 0.92, "reason": "no peers nearby", "value": 1 },
+      { "name": "domain", "kind": "categorical", "score": 0.40, "reason": "rare domain", "value": "fictional" }
+    ]
+  },
+  {
+    "name": "Underwater basket weaving (TS)",
+    "entityType": "skill",
+    "cardinality": 1.0,
+    "zscore": 1.0,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": true,
+    "dimensions": [
+      { "name": "_resolution", "kind": "meta", "score": 1.0, "reason": "entity not in trained profiles", "value": null }
+    ]
+  }
+]

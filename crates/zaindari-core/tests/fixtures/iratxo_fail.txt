@@ -1,0 +1,10 @@
+suite rules/promo.cases.yaml — rule rules/promo.yaml (promo-hard, 100 cases)
+  ok   - flags missing disclaimer en
+  FAIL - promo-missing-disclaimer es
+         triggers: expected ["disclaimer_required"] to fire, actual []
+         classify: expected "block", actual "allow"
+  ok   - passes compliant ad eu
+suite rules/finance.cases.yaml — rule rules/finance.yaml (finance-promo-hard, 8 cases)
+  ok   - apr-required-when-rate-shown
+
+106 passed, 2 failed across 2 suites

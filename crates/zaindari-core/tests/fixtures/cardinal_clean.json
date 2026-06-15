@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Python",
+    "entityType": "skill",
+    "cardinality": 0.12,
+    "zscore": 0.10,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": false,
+    "dimensions": [
+      { "name": "frequency", "kind": "numeric", "score": 0.10, "reason": "common skill", "value": 4210 }
+    ]
+  },
+  {
+    "name": "Rust",
+    "entityType": "skill",
+    "cardinality": 0.31,
+    "zscore": 0.28,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": false,
+    "dimensions": [
+      { "name": "frequency", "kind": "numeric", "score": 0.30, "reason": "moderately common", "value": 980 }
+    ]
+  },
+  {
+    "name": "TypeScript",
+    "entityType": "skill",
+    "cardinality": 0.18,
+    "zscore": 0.15,
+    "mode": "knn",
+    "threshold": 0.6,
+    "flagged": false,
+    "dimensions": [
+      { "name": "frequency", "kind": "numeric", "score": 0.16, "reason": "common skill", "value": 3100 }
+    ]
+  }
+]
