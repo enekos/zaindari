@@ -104,6 +104,70 @@ fn report_subcommand_renders_saved_json_to_html() {
     assert!(!html.contains("http"));
 }
 
+// The native emitter just has to write the envelope to {out}; here we stage it
+// in a file and `cp` it, so the test config stays free of JSON-in-TOML quoting.
+#[cfg(unix)]
+fn write_native_gate_config(dir: &Path, envelope: &str) {
+    fs::write(dir.join("envelope.json"), envelope).unwrap();
+    fs::write(
+        dir.join("zaindari.toml"),
+        "[gate]\nreport_cmd = [\"cp\", \"envelope.json\", \"{out}\"]\n",
+    )
+    .unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn gate_native_report_cmd_drives_the_pillar_end_to_end() {
+    // A `report_cmd` engine: any command that writes the native envelope to the
+    // {out} path. The staged file stands in for berme-eval. Proves the whole
+    // path: config -> run dispatch -> native adapter -> report -> exit policy.
+    let dir = tempfile::tempdir().unwrap();
+    write_native_gate_config(
+        dir.path(),
+        r#"{"schemaVersion":1,"toolVersion":"fake-eval 1.2","pillar":{"status":"pass","headline":"native gate held: key-F1 0.97","metrics":[{"name":"key_f1","value":0.97,"direction":"higher_better"}],"findings":[]}}"#,
+    );
+
+    let out = Command::new(bin())
+        .args(["gate", "--json"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "native gate should pass: {:?}", out);
+
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["pillars"]["gate"]["status"], "pass");
+    assert_eq!(
+        report["pillars"]["gate"]["headline"],
+        "native gate held: key-F1 0.97"
+    );
+    assert_eq!(report["toolVersions"]["gate"], "fake-eval 1.2");
+}
+
+#[cfg(unix)]
+#[test]
+fn gate_native_fail_status_gates_with_exit_two() {
+    // An emitter reporting FAIL must gate the build (exit 2) even when the
+    // command itself exited 0 — the envelope's status is authoritative.
+    let dir = tempfile::tempdir().unwrap();
+    write_native_gate_config(
+        dir.path(),
+        r#"{"schemaVersion":1,"pillar":{"status":"fail","headline":"eval regressed"}}"#,
+    );
+
+    let out = Command::new(bin())
+        .arg("gate")
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "FAIL pillar should gate: {:?}",
+        out
+    );
+}
+
 #[test]
 fn run_without_config_errors_with_exit_one() {
     // A bare temp dir with no zaindari.toml anywhere up to root would still

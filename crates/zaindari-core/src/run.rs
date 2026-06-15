@@ -2,7 +2,7 @@
 //! [`ZaindariReport`]. The *parsing* lives in the adapters and is pure; this
 //! module owns the side-effecting invocation and the raw-output capture.
 
-use crate::adapters::{gate, guard, watch};
+use crate::adapters::{gate, guard, native, watch};
 use crate::config::{Config, GateConfig, GuardConfig, WatchConfig};
 use crate::engine::{self, EngineError};
 use crate::report::{PillarResult, PillarStatus, ZaindariReport};
@@ -94,6 +94,11 @@ pub fn run(cfg: &Config, sel: Selection, ctx: &RunContext) -> ZaindariReport {
 }
 
 fn run_gate(gc: &GateConfig, ctx: &RunContext, version_slot: &mut Option<String>) -> PillarResult {
+    // Native-emitter mode: the consumer's own harness writes the envelope.
+    if let Some(cmd) = &gc.report_cmd {
+        return run_native(cmd, ctx, "gate-native.json", version_slot);
+    }
+
     let out_path = raw_path(ctx, "gate-aatxe-evals.json");
     let mut args: Vec<String> = vec!["evals".to_string()];
     let out_for_engine = out_path
@@ -159,6 +164,75 @@ fn extract_aatxe_version(json: &str) -> Option<String> {
     v.get("aatxeVersion")
         .and_then(|x| x.as_str())
         .map(str::to_string)
+}
+
+/// Drive a pillar from an arbitrary native-emitter command. zaindari picks the
+/// output path, substitutes the `{out}` token in the command's args, runs it,
+/// then reads back the native envelope. The emitter owns pass/fail via
+/// `pillar.status`; a non-zero exit is fine as long as the envelope was written
+/// (e.g. an eval harness that exits 1 on regression still reports its FAIL).
+fn run_native(
+    cmd: &[String],
+    ctx: &RunContext,
+    raw_name: &str,
+    version_slot: &mut Option<String>,
+) -> PillarResult {
+    let Some((bin, rest)) = cmd.split_first() else {
+        return PillarResult::new(
+            PillarStatus::EngineMissing,
+            "report_cmd is empty — give it `[program, args…]`",
+        );
+    };
+
+    let raw = raw_path(ctx, raw_name);
+    let out_for_engine = raw
+        .clone()
+        .unwrap_or_else(|| ctx.cwd.join(format!("zaindari-{raw_name}")));
+    let out_str = out_for_engine.to_string_lossy();
+    let args: Vec<String> = rest.iter().map(|a| a.replace("{out}", &out_str)).collect();
+
+    let run = match engine::run(bin, &args, ctx.cwd) {
+        Ok(r) => r,
+        Err(EngineError::Missing(_)) => {
+            return PillarResult::engine_missing(bin, native::install_hint())
+        }
+        Err(e) => return PillarResult::new(PillarStatus::EngineMissing, e.to_string()),
+    };
+
+    let json = match std::fs::read_to_string(&out_for_engine) {
+        Ok(s) => s,
+        Err(e) => {
+            return PillarResult::new(
+                PillarStatus::EngineMissing,
+                format!(
+                    "`{bin}` ran (exit {:?}) but wrote no native report at {}: {e}{}",
+                    run.exit_code,
+                    out_for_engine.display(),
+                    stderr_tail(&run.stderr),
+                ),
+            )
+        }
+    };
+
+    match native::parse(&json, raw.map(|p| p.to_string_lossy().into_owned())) {
+        Ok((pillar, ver)) => {
+            if ver.is_some() {
+                *version_slot = ver;
+            }
+            pillar
+        }
+        Err(e) => PillarResult::new(PillarStatus::EngineMissing, e.to_string()),
+    }
+}
+
+/// A trailing snippet of stderr for error context, prefixed only when present.
+fn stderr_tail(stderr: &str) -> String {
+    let t = stderr.trim();
+    if t.is_empty() {
+        String::new()
+    } else {
+        format!(" — stderr: {t}")
+    }
 }
 
 fn run_guard(gc: &GuardConfig, ctx: &RunContext) -> PillarResult {

@@ -38,23 +38,33 @@ pub struct Config {
     pub watch: Option<WatchConfig>,
 }
 
-/// Gate pillar — `aatxe evals`.
+/// Gate pillar. By default wraps `aatxe evals`; set `report_cmd` to drive the
+/// pillar with any command that emits the native `zaindari.report` envelope
+/// instead (see [`crate::adapters::native`]) — this is how a consumer's own
+/// eval harness (e.g. berme-eval) plugs in without zaindari knowing it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GateConfig {
     /// Path to the `aatxe` binary; defaults to the bare name on PATH.
+    /// Ignored when `report_cmd` is set.
     #[serde(default = "default_aatxe_bin")]
     pub bin: String,
-    /// Council corpus directory passed as `--corpus`.
+    /// Council corpus directory passed as `--corpus`. (aatxe mode only.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corpus: Option<PathBuf>,
-    /// Baseline eval JSON passed as `--baseline`.
+    /// Baseline eval JSON passed as `--baseline`. (aatxe mode only.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub baseline: Option<PathBuf>,
     /// Extra flags appended verbatim to the `aatxe evals` invocation
-    /// (e.g. `--council`, `--stats`, `--confidence-floor 0.3`).
+    /// (e.g. `--council`, `--stats`, `--confidence-floor 0.3`). (aatxe mode.)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
+    /// Native-emitter mode: `[program, args…]`. When present, zaindari runs
+    /// this command instead of `aatxe` and reads the native envelope it writes.
+    /// The literal token `{out}` in any argument is replaced with the path
+    /// zaindari wants the JSON written to. The aatxe fields above are ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_cmd: Option<Vec<String>>,
 }
 
 /// Guard pillar — `iratxo test`.
@@ -159,6 +169,9 @@ const SAMPLE_CONFIG: &str = r#"# zaindari.toml — one config over three LLM-tru
 corpus = "evals/council/cases"  # council corpus dir (--corpus)
 baseline = "evals/baseline.json" # baseline eval JSON (--baseline); regression -> exit 2
 flags = ["--council", "--stats"] # appended verbatim to `aatxe evals`
+# Or drive Gate with your own eval harness instead of aatxe — any command that
+# writes the native zaindari.report envelope to the `{out}` path:
+# report_cmd = ["my-eval", "--baseline", "base.json", "--zaindari-report", "{out}"]
 
 # ── Guard: runtime rule packs (engine: iratxo) ───────────────────────────────
 [guard]
@@ -203,6 +216,26 @@ input = "i.json"
         let w = cfg.watch.unwrap();
         assert_eq!(w.bin, "cardinal-map");
         assert_eq!(w.anomaly_threshold, 0.6);
+    }
+
+    #[test]
+    fn gate_report_cmd_parses_for_native_emitter() {
+        let src = r#"
+[gate]
+report_cmd = ["berme-eval", "--baseline", "base.json", "--zaindari-report", "{out}"]
+"#;
+        let cfg = Config::from_toml_str(src, Path::new("zaindari.toml")).unwrap();
+        let g = cfg.gate.unwrap();
+        assert_eq!(
+            g.report_cmd.unwrap(),
+            vec![
+                "berme-eval",
+                "--baseline",
+                "base.json",
+                "--zaindari-report",
+                "{out}"
+            ]
+        );
     }
 
     #[test]
