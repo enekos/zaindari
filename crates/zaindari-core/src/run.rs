@@ -162,7 +162,7 @@ fn extract_aatxe_version(json: &str) -> Option<String> {
 }
 
 fn run_guard(gc: &GuardConfig, ctx: &RunContext) -> PillarResult {
-    let mut args: Vec<String> = vec!["test".to_string()];
+    let mut args: Vec<String> = vec!["test".to_string(), "--json".to_string()];
     for p in &gc.packs {
         args.push(p.to_string_lossy().into_owned());
     }
@@ -173,16 +173,21 @@ fn run_guard(gc: &GuardConfig, ctx: &RunContext) -> PillarResult {
         }
         Err(e) => return PillarResult::new(PillarStatus::EngineMissing, e.to_string()),
     };
-    let raw = raw_path(ctx, "guard-iratxo-test.txt");
+    let raw = raw_path(ctx, "guard-iratxo-test.json");
     if let Some(p) = &raw {
-        let _ = std::fs::write(p, format!("{}\n--- stderr ---\n{}", run.stdout, run.stderr));
+        let _ = std::fs::write(p, &run.stdout);
     }
-    guard::parse(
+    match guard::parse(
         &run.stdout,
-        &run.stderr,
         run.exit_code,
         raw.map(|p| p.to_string_lossy().into_owned()),
-    )
+    ) {
+        Ok(r) => r,
+        Err(e) => PillarResult::new(
+            PillarStatus::EngineMissing,
+            format!("iratxo test --json output did not parse: {e}"),
+        ),
+    }
 }
 
 fn run_watch(wc: &WatchConfig, ctx: &RunContext) -> PillarResult {

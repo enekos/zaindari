@@ -37,6 +37,27 @@ Each pillar can also run on its own: `zaindari gate`, `zaindari guard`,
 `zaindari watch`. The config is discovered by walking up from the working
 directory, so subcommands work from anywhere inside the project.
 
+## Verified end-to-end
+
+The first real cross-pillar run — all three engines driven for real (no
+fixtures, offline, no LLM key), config in [`dogfood/`](dogfood/zaindari.toml):
+
+```
+$ zaindari run --out report
+wrote report
+zaindari report (schema v1)
+  gate   · PASS   Eval gate held: critical F1 0.12, 6/24 cases fully recalled (stub-LLM run, aatxe 0.1.1).
+  guard  · PASS   All 22 guard rule case(s) passed across 1 suite(s).
+  watch  · WARN   1 of 6 monitored item(s) look anomalous — review before trusting the output.
+           - major: anomalous product: Quantum Flux Capacitor
+```
+
+`gate` reads back a real `aatxe` eval report and diffs it against a committed
+baseline (no regression); `guard` consumes `iratxo test --json` (22 finance
+promo-rule cases); `watch` scores 6 product names against a trained
+`cardinal-map` profile and flags the one novelty. Exit `0` (Watch anomalies are
+a warning by default); `--strict-watch` promotes that WARN to a gating exit `2`.
+
 ## Configuration
 
 `zaindari.toml` — every section is optional. A **missing** section means that
@@ -102,7 +123,7 @@ point the config at each binary (or rely on the bare name being on `PATH`).
   regression baselines and an LLM review council. zaindari runs
   `aatxe evals --out <json> [--baseline <json>]` and reads the eval JSON.
 - **Guard — iratxo**: YAML→IR→WASM rule engine; portable signed rule packs.
-  zaindari runs `iratxo test <packs…>` and parses its result.
+  zaindari runs `iratxo test --json <packs…>` and reads the structured result.
 - **Watch — cardinal-map**: label-free anomaly detection on LLM extractions.
   zaindari runs `cardinal-map check --json` and reads the per-item scores.
 
@@ -118,8 +139,8 @@ engines as libraries or run any model itself.
 **Roadmap**
 - **Library bindings** — link the engines in-process (no subprocess, no JSON
   round-trip) once their public APIs stabilise.
-- **Machine-readable Guard output** — `iratxo test` emits human text today;
-  a `--json` mode would make the Guard adapter robust (tracked as a follow-up).
+- **Persist raw engine output** — wire `raw_ref` so each pillar links back to
+  the full engine output behind its summary.
 - **Hosted** — a dashboard, a signed domain-pack registry, and a cross-repo
   learning corpus, after design partners ask for it.
 

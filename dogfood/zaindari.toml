@@ -1,0 +1,23 @@
+# zaindari.toml — dogfood config: the first real cross-pillar run.
+#
+# Wires the three engines against their own committed example data, all
+# offline (no LLM key, deterministic). Paths are absolute and local to this
+# machine — the three engines live as sibling repos under ~/eneko_projects.
+# This file documents what a real 3-pillar `zaindari run` looks like; a
+# shipped project would point these at its own corpus / packs / profile.
+
+# ── Gate: pre-ship eval regression gate (engine: aatxe) ──────────────────────
+[gate]
+corpus = "/Users/enekosarasola/eneko_projects/aatxe/evals/council/cases"
+baseline = "/Users/enekosarasola/eneko_projects/aatxe/evals/council/baselines/stub.json"
+
+# ── Guard: runtime rule packs (engine: iratxo, --json) ───────────────────────
+[guard]
+packs = ["/Users/enekosarasola/eneko_projects/iratxo/examples/rules/finance/promo-hard.cases.yaml"]
+
+# ── Watch: post-ship drift detection (engine: cardinal-map) ──────────────────
+[watch]
+profiles = "/Users/enekosarasola/eneko_projects/cardinal-map/profiles/product"
+schema = "/Users/enekosarasola/eneko_projects/cardinal-map/schemas/product.json"
+input = "/Users/enekosarasola/eneko_projects/zaindari/dogfood/watch-names.json"
+anomaly_threshold = 0.6

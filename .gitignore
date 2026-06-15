@@ -2,3 +2,8 @@
 **/*.rs.bk
 *.pdb
 .DS_Store
+
+# dogfood run outputs (config + inputs are tracked; generated reports are not)
+/dogfood/report
+/dogfood/report.html
+/dogfood/zaindari-aatxe-evals.json
