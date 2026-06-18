@@ -77,14 +77,14 @@ pub fn run(cfg: &Config, sel: Selection, ctx: &RunContext) -> ZaindariReport {
     }
     if let Some(gc) = &cfg.guard {
         report.pillars.guard = Some(if sel.guard {
-            run_guard(gc, ctx)
+            run_guard(gc, ctx, &mut report.tool_versions.guard)
         } else {
             PillarResult::new(PillarStatus::Skipped, "guard not selected this run")
         });
     }
     if let Some(wc) = &cfg.watch {
         report.pillars.watch = Some(if sel.watch {
-            run_watch(wc, ctx)
+            run_watch(wc, ctx, &mut report.tool_versions.watch)
         } else {
             PillarResult::new(PillarStatus::Skipped, "watch not selected this run")
         });
@@ -235,7 +235,16 @@ fn stderr_tail(stderr: &str) -> String {
     }
 }
 
-fn run_guard(gc: &GuardConfig, ctx: &RunContext) -> PillarResult {
+fn run_guard(
+    gc: &GuardConfig,
+    ctx: &RunContext,
+    version_slot: &mut Option<String>,
+) -> PillarResult {
+    // Native-emitter mode: the consumer's own rule engine writes the envelope.
+    if let Some(cmd) = &gc.report_cmd {
+        return run_native(cmd, ctx, "guard-native.json", version_slot);
+    }
+
     let mut args: Vec<String> = vec!["test".to_string(), "--json".to_string()];
     for p in &gc.packs {
         args.push(p.to_string_lossy().into_owned());
@@ -264,16 +273,33 @@ fn run_guard(gc: &GuardConfig, ctx: &RunContext) -> PillarResult {
     }
 }
 
-fn run_watch(wc: &WatchConfig, ctx: &RunContext) -> PillarResult {
+fn run_watch(
+    wc: &WatchConfig,
+    ctx: &RunContext,
+    version_slot: &mut Option<String>,
+) -> PillarResult {
+    // Native-emitter mode: the consumer's own drift detector writes the envelope.
+    if let Some(cmd) = &wc.report_cmd {
+        return run_native(cmd, ctx, "watch-native.json", version_slot);
+    }
+
+    // cardinal-map mode needs the trained-profile inputs; absent them, the
+    // section is misconfigured (neither native nor a complete cardinal setup).
+    let (Some(schema), Some(profiles), Some(input)) = (&wc.schema, &wc.profiles, &wc.input) else {
+        return PillarResult::new(
+            PillarStatus::EngineMissing,
+            "[watch] needs either `report_cmd` or all of `schema`/`profiles`/`input` for cardinal-map",
+        );
+    };
     let args: Vec<String> = vec![
         "check".to_string(),
         "--json".to_string(),
         "--schema".to_string(),
-        wc.schema.to_string_lossy().into_owned(),
+        schema.to_string_lossy().into_owned(),
         "--profiles".to_string(),
-        wc.profiles.to_string_lossy().into_owned(),
+        profiles.to_string_lossy().into_owned(),
         "--input".to_string(),
-        wc.input.to_string_lossy().into_owned(),
+        input.to_string_lossy().into_owned(),
         "--threshold".to_string(),
         wc.anomaly_threshold.to_string(),
     ];
@@ -341,6 +367,7 @@ mod tests {
             guard: Some(GuardConfig {
                 bin: "iratxo".into(),
                 packs: vec!["x.cases.yaml".into()],
+                report_cmd: None,
             }),
             ..Default::default()
         };
@@ -359,6 +386,7 @@ mod tests {
             guard: Some(GuardConfig {
                 bin: "zaindari-no-such-binary-xyz".into(),
                 packs: vec!["x.cases.yaml".into()],
+                report_cmd: None,
             }),
             ..Default::default()
         };
@@ -370,5 +398,55 @@ mod tests {
         let g = report.pillars.guard.unwrap();
         assert_eq!(g.status, PillarStatus::EngineMissing);
         assert!(g.headline.contains("not found"));
+    }
+
+    #[test]
+    fn guard_native_report_cmd_short_circuits_to_native() {
+        // a report_cmd whose binary is absent still proves the native path is
+        // taken (engine_missing from native, not from iratxo) without needing
+        // packs configured.
+        let cfg = Config {
+            guard: Some(GuardConfig {
+                bin: "iratxo".into(),
+                packs: vec![],
+                report_cmd: Some(vec![
+                    "zaindari-no-such-native-xyz".into(),
+                    "--zaindari-report".into(),
+                    "{out}".into(),
+                ]),
+            }),
+            ..Default::default()
+        };
+        let ctx = RunContext {
+            cwd: Path::new("."),
+            raw_dir: None,
+        };
+        let report = run(&cfg, Selection::only_guard(), &ctx);
+        let g = report.pillars.guard.unwrap();
+        assert_eq!(g.status, PillarStatus::EngineMissing);
+        assert!(g.headline.contains("not found"));
+    }
+
+    #[test]
+    fn watch_without_native_or_cardinal_inputs_is_engine_missing() {
+        let cfg = Config {
+            watch: Some(WatchConfig {
+                bin: "cardinal-map".into(),
+                profiles: None,
+                schema: None,
+                input: None,
+                anomaly_threshold: 0.6,
+                report_cmd: None,
+            }),
+            ..Default::default()
+        };
+        let ctx = RunContext {
+            cwd: Path::new("."),
+            raw_dir: None,
+        };
+        let report = run(&cfg, Selection::only_watch(), &ctx);
+        let w = report.pillars.watch.unwrap();
+        assert_eq!(w.status, PillarStatus::EngineMissing);
+        assert!(w.headline.contains("report_cmd"));
     }
 }

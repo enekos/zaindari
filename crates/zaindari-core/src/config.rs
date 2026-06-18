@@ -67,33 +67,54 @@ pub struct GateConfig {
     pub report_cmd: Option<Vec<String>>,
 }
 
-/// Guard pillar — `iratxo test`.
+/// Guard pillar. By default wraps `iratxo test`; set `report_cmd` to drive the
+/// pillar with any command that emits the native `zaindari.report` envelope
+/// instead (e.g. berme-guard runs berme-expr criteria over fixtures) — the same
+/// native-emitter contract as [`GateConfig::report_cmd`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GuardConfig {
     /// Path to the `iratxo` binary; defaults to the bare name on PATH.
+    /// Ignored when `report_cmd` is set.
     #[serde(default = "default_iratxo_bin")]
     pub bin: String,
-    /// Pack / suite / directory paths passed to `iratxo test`.
+    /// Pack / suite / directory paths passed to `iratxo test`. (iratxo mode only.)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub packs: Vec<PathBuf>,
+    /// Native-emitter mode: `[program, args…]` writing the envelope to `{out}`.
+    /// When present, zaindari runs this instead of `iratxo`; `packs` is ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_cmd: Option<Vec<String>>,
 }
 
-/// Watch pillar — `cardinal-map check`.
+/// Watch pillar. By default wraps `cardinal-map check`; set `report_cmd` to
+/// drive the pillar with any command that emits the native `zaindari.report`
+/// envelope instead (e.g. berme-watch scores cross-document consistency flags) —
+/// the same native-emitter contract as [`GateConfig::report_cmd`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WatchConfig {
     /// Path to the `cardinal-map` binary; defaults to the bare name on PATH.
+    /// Ignored when `report_cmd` is set.
     #[serde(default = "default_cardinal_bin")]
     pub bin: String,
-    /// Trained-profile directory passed as `--profiles`.
-    pub profiles: PathBuf,
-    /// Entity schema JSON passed as `--schema`.
-    pub schema: PathBuf,
-    /// JSON array of names to score, passed as `--input`.
-    pub input: PathBuf,
+    /// Trained-profile directory passed as `--profiles`. (cardinal-map mode only.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profiles: Option<PathBuf>,
+    /// Entity schema JSON passed as `--schema`. (cardinal-map mode only.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<PathBuf>,
+    /// JSON array of names to score, passed as `--input`. (cardinal-map mode only.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<PathBuf>,
     /// Cardinality threshold above which an item is flagged anomalous.
     #[serde(default = "default_watch_threshold")]
     pub anomaly_threshold: f64,
+    /// Native-emitter mode: `[program, args…]` writing the envelope to `{out}`.
+    /// When present, zaindari runs this instead of `cardinal-map`; the
+    /// `profiles`/`schema`/`input` fields are ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_cmd: Option<Vec<String>>,
 }
 
 fn default_aatxe_bin() -> String {
@@ -177,6 +198,9 @@ flags = ["--council", "--stats"] # appended verbatim to `aatxe evals`
 [guard]
 # bin = "iratxo"
 packs = ["rules/promo.cases.yaml"] # suite / pack / dir paths for `iratxo test`
+# Or drive Guard with your own rule engine — any command writing the native
+# envelope (e.g. berme-guard evaluates berme-expr criteria over fixtures):
+# report_cmd = ["berme-guard", "pack.json", "--zaindari-report", "{out}"]
 
 # ── Watch: post-ship drift detection (engine: cardinal-map) ──────────────────
 [watch]
@@ -185,6 +209,9 @@ profiles = "profiles/product"   # trained-profile dir (--profiles)
 schema = "schemas/product.json" # entity schema (--schema)
 input = "watch/today.json"      # JSON array of names to score (--input)
 anomaly_threshold = 0.6         # cardinality >= this is flagged anomalous
+# Or drive Watch with your own drift detector — any command writing the native
+# envelope (e.g. berme-watch scores cross-document consistency flags):
+# report_cmd = ["berme-watch", "profiles.json", "--zaindari-report", "{out}"]
 "#;
 
 #[cfg(test)]
